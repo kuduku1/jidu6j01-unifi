@@ -39,7 +39,7 @@ need_file /usr/lib/lua/bit.so                                 "luabitop"
 # Tools openUF shells out to. Names may be an apk "alternatives" symlink with
 # an ABSOLUTE target (e.g. /usr/sbin/tc -> /usr/libexec/tc-tiny), which only
 # resolves on the device, so a symlink counts as present.
-for spec in iw lldpd tc nft bridge hostapd_cli "usteerd usteer"; do
+for spec in iw lldpd tc nft bridge hostapd_cli "usteerd usteer" tailscale; do
 	p=""
 	for b in $spec; do
 		for d in usr/sbin usr/bin sbin bin usr/libexec etc/init.d; do
@@ -92,7 +92,7 @@ chk "libmbedtls[0-9]*" 3.6.7   "CVE-2026-50713, CVE-2026-25832"
 chk "libopenssl[0-9]*" 3.5.9   "latest 3.5 LTS"
 chk odhcpd        0       "CVE-2026-53921 fixed in 25.12.5+; service disabled on the AP"
 kv=$(ver kernel); out "| ℹ️ | kernel | ${kv:-?} | 6.12.112 = OpenWrt 25.12.6 |"
-for p in wpad-mbedtls hostapd-utils uhttpd luci-base ucode lldpd openuf luci-app-openuf luci-theme-halo; do
+for p in wpad-mbedtls hostapd-utils uhttpd luci-base ucode lldpd tailscale openuf luci-app-openuf luci-theme-halo; do
 	out "| ℹ️ | $p | $(ver $p) | |"
 done
 

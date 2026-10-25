@@ -1,5 +1,5 @@
 # Packages added to the stock JIDU6J01 image (one per line, "-name" removes).
-# Everything openUF needs is baked in: the device never has to download anything.
+# Everything openUF and Tailscale need is baked in: the device never has to download anything.
 
 # Full hostapd (802.11v/k): controller-pushed WLANs fail on the basic build
 -wpad-basic-mbedtls
@@ -31,3 +31,8 @@ uhttpd-mod-ucode
 # Web UI over HTTPS
 luci
 luci-ssl
+
+# Tailscale VPN pre-installed inside the ROM
+tailscale
+ca-bundle
+kmod-tun

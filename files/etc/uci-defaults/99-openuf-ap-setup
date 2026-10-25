@@ -73,6 +73,7 @@ sh /usr/lib/openuf/hook/openuf-bootstrap.sh || echo "WARNING: bootstrap account 
 # ── services ───────────────────────────────────────────────────────────────
 /etc/init.d/lldpd enable
 /etc/init.d/openuf enable
+[ -x /etc/init.d/tailscale ] && /etc/init.d/tailscale enable
 
 echo "=== first boot setup done ==="
 exit 0
