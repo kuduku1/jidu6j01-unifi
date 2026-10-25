@@ -1,0 +1,33 @@
+# Packages added to the stock JIDU6J01 image (one per line, "-name" removes).
+# Everything openUF needs is baked in: the device never has to download anything.
+
+# Full hostapd (802.11v/k): controller-pushed WLANs fail on the basic build
+-wpad-basic-mbedtls
+wpad-mbedtls
+
+# openUF itself (openuf, luci-app-openuf, luci-theme-halo) is staged as files
+# by the workflow; these are everything it needs from the official feed.
+luci-base
+rpcd-mod-ucode
+# openUF's dependencies, listed explicitly so a missing one fails the build
+lua
+luabitop
+lua-cjson
+luasocket
+lua-openssl
+libuci-lua
+iw
+lldpd
+ip-bridge
+hostapd-utils
+usteer
+nftables
+kmod-nft-bridge
+tc-tiny
+kmod-ifb
+kmod-sched-act-police
+uhttpd-mod-ucode
+
+# Web UI over HTTPS
+luci
+luci-ssl
