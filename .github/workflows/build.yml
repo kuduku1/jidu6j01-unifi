@@ -197,14 +197,6 @@ jobs:
           cat files/etc/openuf/build-info >> "$GITHUB_STEP_SUMMARY"
           [ -z "${AUDIT_FAIL:-}" ]
 
-      - name: CVE scan of binaries (cve-bin-tool, informational)
-        if: always() && hashFiles('out/*sysupgrade.bin') != ''
-        continue-on-error: true
-        timeout-minutes: 40
-        run: |
-          pip install --quiet cve-bin-tool
-          cve-bin-tool -n json-mirror -f md -o out/CVE-SCAN.md rootfs || true
-          [ -f out/CVE-SCAN.md ] && { echo "## cve-bin-tool"; head -150 out/CVE-SCAN.md; } >> "$GITHUB_STEP_SUMMARY"
 
       # Uploaded even when the audit flags something, so the image is never lost;
       # read AUDIT.md before flashing.
@@ -218,5 +210,4 @@ jobs:
             out/*.manifest
             out/sha256sums
             out/AUDIT.md
-            out/CVE-SCAN.md
           if-no-files-found: warn
