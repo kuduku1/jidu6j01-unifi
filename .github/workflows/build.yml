@@ -66,16 +66,15 @@ jobs:
           echo "ver=$V" >> "$GITHUB_OUTPUT"
           curl -fsSL "$BASE/sha256sums" -o sha256sums
           curl -fsSL "$BASE/profiles.json" -o profiles.json
-          SDK=$(grep -o 'openwrt-sdk-[^ ]*Linux-x86_64.tar.zst' sha256sums | head -1)
           IB=$(grep -o 'openwrt-imagebuilder-[^ ]*Linux-x86_64.tar.zst' sha256sums | head -1)
-          echo "sdk=$SDK" >> "$GITHUB_OUTPUT"; echo "ib=$IB" >> "$GITHUB_OUTPUT"
+          echo "ib=$IB" >> "$GITHUB_OUTPUT"
           # The device must exist in this release, with the five variants.
           jq -e --arg p "$PROFILE" '.profiles[$p]' profiles.json > profile.json
           jq -r '.titles[] | "\(.vendor) \(.model) \(.variant)"' profile.json
           jq -r '"default packages: " + (.device_packages|join(" "))' profile.json
           echo "commit=$(jq -r .version_code profiles.json)" >> "$GITHUB_OUTPUT"
 
-      # ── 1. openUF packages (openuf, luci-app-openuf, luci-theme-halo) ──────
+      # ── 1. openUF (openuf, luci-app-openuf, luci-theme-halo) ─────────────────
       - name: Fetch openUF and build its source archive
         id: ouf
         run: |
@@ -93,37 +92,48 @@ jobs:
           sudo ln -sf /usr/bin/lua5.1 /usr/local/bin/lua
           sudo luarocks --lua-version 5.1 install lua-cjson LUA_INCDIR=/usr/include/lua5.1
           sh tools/release-archive.sh "$VER"      # runs openUF's test suite too
-          SHA=$(cut -d' ' -f1 "openuf-$VER.tar.gz.sha256")
-          sed -i "s/^PKG_VERSION:=.*/PKG_VERSION:=$VER/" package/openuf/Makefile package/luci-app-openuf/Makefile
-          sed -i "s/^PKG_HASH:=.*/PKG_HASH:=$SHA/" package/openuf/Makefile
-          sed -i "s|^PKG_SOURCE_URL:=.*|PKG_SOURCE_URL:=file://$PWD/|" package/openuf/Makefile
-          grep -E '^PKG_(VERSION|HASH|SOURCE_URL):=' package/openuf/Makefile
+          ls -d build/release/openuf-$VER/openuf
 
-      - name: OpenWrt SDK (${{ steps.s.outputs.ver }})
+      # openuf, luci-app-openuf and luci-theme-halo are architecture-independent
+      # Lua/JS/CSS with nothing to compile. They are laid into the image exactly
+      # where their package Makefiles (and luci.mk) install them; their
+      # dependencies come prebuilt from the official 25.12.6 feed (packages.txt).
+      # (Building them with the SDK recompiled lua/luabitop/lua-openssl from
+      # source and failed; their postinst scripts do nothing at image time.)
+      - name: Stage openUF, luci-app-openuf, luci-theme-halo into the image
         run: |
           set -eu
-          curl -fsSL "${{ steps.s.outputs.base }}/${{ steps.s.outputs.sdk }}" -o sdk.tar.zst
-          SUM=$(awk -v f="${{ steps.s.outputs.sdk }}" '$2==f || $2=="*"f {print $1}' sha256sums)
-          echo "$SUM  sdk.tar.zst" | sha256sum -c -
-          mkdir sdk && tar --zstd -xf sdk.tar.zst -C sdk --strip-components=1
-          mkdir -p sdk/dl && cp openUF/openuf-${{ steps.ouf.outputs.ver }}.tar.gz sdk/dl/
-
-      - name: Build openUF packages
-        working-directory: sdk
-        run: |
-          set -eu
-          grep -E '^src-git(-full)? (base|packages|luci) ' feeds.conf.default > feeds.conf
-          echo "src-link openuf $GITHUB_WORKSPACE/openUF/package" >> feeds.conf
-          ./scripts/feeds update -a >/dev/null
-          ./scripts/feeds install -a -p openuf
-          ./scripts/feeds install luci-base
-          make defconfig >/dev/null
-          for p in openuf luci-app-openuf luci-theme-halo; do
-            make package/$p/compile -j"$(nproc)" || make package/$p/compile -j1 V=s
+          VER=${{ steps.ouf.outputs.ver }}
+          SRC=openUF/build/release/openuf-$VER/openuf
+          F=files
+          L=$F/usr/lib/openuf
+          install -d $L/lib $L/modelmap $L/ufmodel $L/hook $F/usr/bin $F/usr/sbin \
+                     $F/etc/init.d $F/etc/config $F/etc/openuf $F/lib/upgrade/keep.d
+          install -m644 $SRC/*.lua $L/
+          [ -f $SRC/BUILD ] && install -m644 $SRC/BUILD $L/
+          echo "$VER" > $L/VERSION
+          install -m644 $SRC/lib/*.lua $L/lib/
+          install -m644 $SRC/modelmap/*.lua $L/modelmap/
+          install -m644 $SRC/ufmodel/*.lua $L/ufmodel/
+          install -m644 $SRC/hook/*.lua $L/hook/
+          install -m755 $SRC/hook/*.sh $L/hook/
+          ln -sf ../lib/openuf/hook/syswrapper.sh $F/usr/bin/syswrapper.sh
+          ln -sf ../lib/openuf/hook/openuf-cli.sh $F/usr/bin/openuf
+          ln -sf ../lib/openuf/hook/openuf-convert.sh $F/usr/sbin/openuf-convert
+          ln -sf ../lib/openuf/hook/openuf-deps.sh $F/usr/sbin/openuf-deps
+          install -m755 $SRC/etc/init.d/openuf $F/etc/init.d/openuf
+          install -m644 openUF/package/openuf/files/openuf.config $F/etc/config/openuf
+          install -m644 openUF/package/openuf/files/openuf.upgrade $F/lib/upgrade/keep.d/openuf
+          # LuCI app + theme, luci.mk layout: htdocs -> /www, root -> /, ucode -> /usr/share/ucode/luci
+          for P in luci-app-openuf luci-theme-halo; do
+            D=openUF/package/$P
+            [ -d $D/htdocs ] && { install -d $F/www; cp -a $D/htdocs/. $F/www/; }
+            [ -d $D/root ]   && cp -a $D/root/. $F/
+            [ -d $D/ucode ]  && { install -d $F/usr/share/ucode/luci; cp -a $D/ucode/. $F/usr/share/ucode/luci/; }
           done
-          mkdir -p ../ouf-pkgs
-          find bin -name '*.apk' \( -name 'openuf-*' -o -name 'luci-app-openuf-*' -o -name 'luci-theme-halo-*' \) -exec cp -v {} ../ouf-pkgs/ \;
-          ls -l ../ouf-pkgs; [ "$(ls ../ouf-pkgs | wc -l)" -ge 3 ]
+          chmod 755 $F/etc/uci-defaults/* $F/etc/init.d/*
+          # services enabled at first boot by our uci-defaults (openuf, lldpd)
+          find $F -type f | sort | head -80; echo "... $(find $F -type f | wc -l) files"
 
       # ── 2. Image ─────────────────────────────────────────────────────────────
       - name: OpenWrt ImageBuilder (${{ steps.s.outputs.ver }})
@@ -133,11 +143,6 @@ jobs:
           SUM=$(awk -v f="${{ steps.s.outputs.ib }}" '$2==f || $2=="*"f {print $1}' sha256sums)
           echo "$SUM  ib.tar.zst" | sha256sum -c -
           mkdir ib && tar --zstd -xf ib.tar.zst -C ib --strip-components=1
-          mkdir -p ib/packages && cp ouf-pkgs/*.apk ib/packages/
-          # trust the SDK's signing key for the locally built openUF packages
-          mkdir -p ib/keys
-          for k in sdk/public-key.pem sdk/key-build.pub; do [ -f "$k" ] && cp -v "$k" "ib/keys/openuf-sdk-$(basename "$k")"; done
-          ls ib/keys
 
       - name: First-boot settings
         env:
