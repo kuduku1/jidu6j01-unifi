@@ -199,11 +199,13 @@ jobs:
           sudo unsquashfs -no-progress -d rootfs "$ROOTFS" >/dev/null
           sudo chown -R "$(id -u)" rootfs
           bash scripts/audit-image.sh rootfs out/*.manifest out/AUDIT.md || AUDIT_FAIL=1
+          cat out/AUDIT.md
           cat out/AUDIT.md >> "$GITHUB_STEP_SUMMARY"
           cat files/etc/openuf/build-info >> "$GITHUB_STEP_SUMMARY"
           [ -z "${AUDIT_FAIL:-}" ]
 
       - name: CVE scan of binaries (cve-bin-tool, informational)
+        if: always() && hashFiles('out/*sysupgrade.bin') != ''
         continue-on-error: true
         timeout-minutes: 40
         run: |
@@ -211,7 +213,10 @@ jobs:
           cve-bin-tool -n json-mirror -f md -o out/CVE-SCAN.md rootfs || true
           [ -f out/CVE-SCAN.md ] && { echo "## cve-bin-tool"; head -150 out/CVE-SCAN.md; } >> "$GITHUB_STEP_SUMMARY"
 
+      # Uploaded even when the audit flags something, so the image is never lost;
+      # read AUDIT.md before flashing.
       - uses: actions/upload-artifact@v4
+        if: always() && hashFiles('out/*sysupgrade.bin') != ''
         with:
           name: jidu6j01-openwrt-${{ steps.s.outputs.ver }}-openuf-${{ steps.ouf.outputs.ver }}
           path: |
