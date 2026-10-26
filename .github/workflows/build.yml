@@ -9,6 +9,10 @@ name: Build JIDU6J01 openUF firmware
 on:
   workflow_dispatch:
     inputs:
+      version:
+        description: "Semantic version (e.g. v1.0.0, v1.0.1, v2.0.0)"
+        default: "v1.0.0"
+        required: true
       openwrt_version:
         description: "OpenWrt release (25.12.6 = newest; 25.12-SNAPSHOT = branch head)"
         default: "25.12.6"
@@ -190,7 +194,12 @@ jobs:
             EXTRA_IMAGE_NAME=openuf
           mkdir -p ../out
           cp -v bin/targets/$TARGET/$SUBTARGET/*openuf*  ../out/
-          cd ../out && sha256sum * > sha256sums && cat sha256sums
+          cd ../out
+          VER="${{ inputs.version || 'v1.0.0' }}"
+          for f in *sysupgrade.bin; do
+            [ -f "$f" ] && mv "$f" "OpenCom-MediaTek-6J01-$VER-unifi-sysupgrade.bin"
+          done
+          sha256sum * > sha256sums && cat sha256sums
 
       # ── 3. Audit ─────────────────────────────────────────────────────────────
       - name: Audit image (offline completeness, hardening, CVE versions)
@@ -216,7 +225,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always() && hashFiles('out/*sysupgrade.bin') != ''
         with:
-          name: jidu6j01-openwrt-${{ steps.s.outputs.ver }}-openuf-${{ steps.ouf.outputs.ver }}
+          name: OpenCom-MediaTek-6J01-${{ inputs.version || 'v1.0.0' }}-unifi
           path: |
             out/*sysupgrade.bin
             out/*initramfs*
