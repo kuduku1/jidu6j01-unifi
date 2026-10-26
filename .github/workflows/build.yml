@@ -105,7 +105,7 @@ jobs:
           SRC=openUF/build/release/openuf-$VER/openuf
           F=files
           L=$F/usr/lib/openuf
-          install -d $L/lib $L/modelmap $L/ufmodel $L/hook $F/usr/bin $F/usr/sbin \
+          install -d $L/lib $L/modelmap $L/ufmodel $L/hook $L/rrb $F/usr/bin $F/usr/sbin \
                      $F/etc/init.d $F/etc/config $F/etc/openuf $F/lib/upgrade/keep.d
           install -m644 $SRC/*.lua $L/
           [ -f $SRC/BUILD ] && install -m644 $SRC/BUILD $L/
@@ -115,11 +115,13 @@ jobs:
           install -m644 $SRC/ufmodel/*.lua $L/ufmodel/
           install -m644 $SRC/hook/*.lua $L/hook/
           install -m755 $SRC/hook/*.sh $L/hook/
+          [ -d $SRC/rrb ] && cp -a $SRC/rrb/. $L/rrb/
           ln -sf ../lib/openuf/hook/syswrapper.sh $F/usr/bin/syswrapper.sh
           ln -sf ../lib/openuf/hook/openuf-cli.sh $F/usr/bin/openuf
           ln -sf ../lib/openuf/hook/openuf-convert.sh $F/usr/sbin/openuf-convert
           ln -sf ../lib/openuf/hook/openuf-deps.sh $F/usr/sbin/openuf-deps
           install -m755 $SRC/etc/init.d/openuf $F/etc/init.d/openuf
+          [ -f $SRC/etc/init.d/openuf-rrb ] && install -m755 $SRC/etc/init.d/openuf-rrb $F/etc/init.d/openuf-rrb
           install -m644 openUF/package/openuf/files/openuf.config $F/etc/config/openuf
           install -m644 openUF/package/openuf/files/openuf.upgrade $F/lib/upgrade/keep.d/openuf
           # LuCI app + theme, luci.mk layout: htdocs -> /www, root -> /, ucode -> /usr/share/ucode/luci

@@ -27,6 +27,8 @@ tc-tiny
 kmod-ifb
 kmod-sched-act-police
 uhttpd-mod-ucode
+ucode-mod-socket
+kmod-veth
 
 # Web UI over HTTPS
 luci

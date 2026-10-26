@@ -68,11 +68,23 @@ else
 fi
 
 # ── zero-touch L2 adoption account (ubnt/ubnt, restricted, self-locking) ──
+[ -f /etc/shells ] || touch /etc/shells
+for s in /usr/lib/openuf/hook/adopt-shell.sh /opt/openuf/hook/adopt-shell.sh; do
+	grep -q "$s" /etc/shells || echo "$s" >> /etc/shells
+done
 sh /usr/lib/openuf/hook/openuf-bootstrap.sh || echo "WARNING: bootstrap account not usable"
+
+# Direct LuCI access without portal gate interception
+uci set openuf.web=openuf
+uci set openuf.web.portal='0'
+uci commit openuf
+uci set uhttpd.main.ucode_prefix='/usr/share/ucode/luci/uhttpd.uc'
+uci commit uhttpd
 
 # ── services ───────────────────────────────────────────────────────────────
 /etc/init.d/lldpd enable
 /etc/init.d/openuf enable
+[ -x /etc/init.d/openuf-rrb ] && /etc/init.d/openuf-rrb enable
 [ -x /etc/init.d/tailscale ] && /etc/init.d/tailscale enable
 
 echo "=== first boot setup done ==="

@@ -27,6 +27,8 @@ need_file /usr/lib/openuf/ufmodel/u6iw.lua                    "U6-InWall identit
 need_file /usr/bin/syswrapper.sh                              "syswrapper.sh (controller adoption hook)"
 need_file /usr/sbin/openuf-convert                            "router→AP converter"
 need_file /etc/init.d/openuf                                  "openUF service"
+need_file /etc/init.d/openuf-rrb                              "openuf-rrb 802.11r translator service"
+need_file /usr/lib/openuf/rrb/rrb-unifi.uc                    "openuf-rrb translator script"
 need_file /etc/config/openuf                                  "openUF config"
 need_file /www/openuf/index.html                              "luci-app-openuf device page"
 need_file /usr/share/rpcd/ucode/luci.openuf                   "luci-app-openuf backend"
@@ -92,7 +94,7 @@ chk "libmbedtls[0-9]*" 3.6.7   "CVE-2026-50713, CVE-2026-25832"
 chk "libopenssl[0-9]*" 3.5.9   "latest 3.5 LTS"
 chk odhcpd        0       "CVE-2026-53921 fixed in 25.12.5+; service disabled on the AP"
 kv=$(ver kernel); out "| ℹ️ | kernel | ${kv:-?} | 6.12.112 = OpenWrt 25.12.6 |"
-for p in wpad-mbedtls hostapd-utils uhttpd luci-base ucode lldpd tailscale openuf luci-app-openuf luci-theme-halo; do
+for p in wpad-mbedtls hostapd-utils uhttpd luci-base ucode ucode-mod-socket kmod-veth lldpd tailscale openuf luci-app-openuf luci-theme-halo; do
 	out "| ℹ️ | $p | $(ver $p) | |"
 done
 
