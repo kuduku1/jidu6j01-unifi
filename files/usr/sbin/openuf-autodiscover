@@ -1,0 +1,82 @@
+#!/bin/sh
+# openuf-autodiscover: Automatically find the UniFi Controller on the local LAN
+# and configure openUF inform URL so adoption succeeds out of the box regardless of IP.
+
+RUN_LOG="/tmp/openuf-autodiscover.log"
+
+log() {
+	echo "$(date): $1" >> "$RUN_LOG"
+	logger -t openuf-autodiscover "$1"
+}
+
+log "Starting UniFi controller auto-discovery daemon"
+
+while true; do
+	# If already adopted, controller is already connected and managing us
+	if [ -f /etc/openuf/state.json ] && grep -q '"adopted":true' /etc/openuf/state.json 2>/dev/null; then
+		sleep 120
+		continue
+	fi
+
+	# Check if current inform_url is already valid (not the unresolvable 'unifi' placeholder)
+	CURRENT_URL=$(uci -q get openuf.main.inform_url)
+	[ -z "$CURRENT_URL" ] && CURRENT_URL=$(grep -o '"inform_url":"[^"]*"' /etc/openuf/state.json 2>/dev/null | cut -d'"' -f4)
+
+	# If inform_url is empty or contains default unresolvable 'unifi:8080'
+	NEED_DISCOVERY=0
+	if [ -z "$CURRENT_URL" ] || echo "$CURRENT_URL" | grep -q "unifi:8080"; then
+		NEED_DISCOVERY=1
+	elif ! ping -c 1 -W 1 "$(echo "$CURRENT_URL" | sed -n 's|.*://\([^:/]*\).*|\1|p')" >/dev/null 2>&1; then
+		# Current inform host is unreachable on ping
+		NEED_DISCOVERY=1
+	fi
+
+	if [ "$NEED_DISCOVERY" = "1" ]; then
+		FOUND_IP=""
+
+		# 1. Check default gateway first (most common for UniFi Dream Machine / UCG / Cloud Gateway)
+		GW=$(ip route 2>/dev/null | awk '/default/ {print $3}' | head -1)
+		if [ -n "$GW" ]; then
+			if nc -z -w 1 "$GW" 8080 2>/dev/null; then
+				FOUND_IP="$GW"
+			fi
+		fi
+
+		# 2. If not gateway, scan active ARP neighbors from /proc/net/arp
+		if [ -z "$FOUND_IP" ]; then
+			for ip in $(awk '{print $1}' /proc/net/arp 2>/dev/null | grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+'); do
+				[ "$ip" = "$GW" ] && continue
+				if nc -z -w 1 "$ip" 8080 2>/dev/null; then
+					FOUND_IP="$ip"
+					break
+				fi
+			done
+		fi
+
+		# 3. If found, configure inform URL and hosts entry
+		if [ -n "$FOUND_IP" ]; then
+			log "Discovered active UniFi Controller at $FOUND_IP:8080"
+			
+			# Update /etc/hosts so 'unifi' resolves to this IP
+			sed -i '/[[:space:]]unifi$/d' /etc/hosts 2>/dev/null || true
+			echo "$FOUND_IP unifi" >> /etc/hosts
+			
+			# Configure inform URL via openuf-cli
+			if [ -x /usr/lib/openuf/hook/openuf-cli.sh ]; then
+				sh /usr/lib/openuf/hook/openuf-cli.sh set-inform "http://$FOUND_IP:8080/inform"
+			elif [ -x /usr/bin/openuf ]; then
+				/usr/bin/openuf set-inform "http://$FOUND_IP:8080/inform"
+			fi
+			
+			# Also persist into UCI
+			uci -q set openuf.main.inform_url="http://$FOUND_IP:8080/inform"
+			uci commit openuf 2>/dev/null || true
+			
+			log "Successfully set inform URL to http://$FOUND_IP:8080/inform"
+			sleep 30
+			continue
+		fi
+	fi
+
+	sleep 8
+done

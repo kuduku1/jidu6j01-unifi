@@ -1,0 +1,2 @@
+#!/bin/sh
+exec /usr/lib/openuf/hook/openuf-cli.sh set-inform "$@"

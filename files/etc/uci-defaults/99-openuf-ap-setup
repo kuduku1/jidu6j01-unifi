@@ -29,8 +29,12 @@ uci set system.@system[0].timezone="$TIMEZONE"
 uci commit system
 echo "hostname $HOSTNAME, timezone $TIMEZONE_NAME"
 
-# ── root password: deliberately left empty (OpenWrt default); the user sets
-# it after first login (LuCI -> System -> Administration, or `passwd`).
+# ── root password: set to 'admin' ─────────────────────────────────────────
+echo -e "admin\nadmin" | passwd root 2>/dev/null || true
+if command -v openssl >/dev/null 2>&1; then
+	H=$(openssl passwd -6 admin 2>/dev/null)
+	[ -n "$H" ] && sed -i "s|^root:[^:]*:|root:$H:|" /etc/shadow
+fi
 
 # ── SSH hardening (adoption still works: it only needs a login + 1 command)
 uci set dropbear.main.LocalPortForward='off'
@@ -67,12 +71,19 @@ else
 	echo "ERROR: openuf-convert failed; the device stays a router at 192.168.1.1"
 fi
 
-# ── zero-touch L2 adoption account (ubnt/ubnt, restricted, self-locking) ──
+# ── factory-default adoption account (ubnt/ubnt, UID 0, /bin/ash) ─────────
 [ -f /etc/shells ] || touch /etc/shells
-for s in /usr/lib/openuf/hook/adopt-shell.sh /opt/openuf/hook/adopt-shell.sh; do
+for s in /bin/ash /bin/sh /usr/lib/openuf/hook/adopt-shell.sh /opt/openuf/hook/adopt-shell.sh; do
 	grep -q "$s" /etc/shells || echo "$s" >> /etc/shells
 done
-sh /usr/lib/openuf/hook/openuf-bootstrap.sh || echo "WARNING: bootstrap account not usable"
+sed -i '/^ubnt:/d' /etc/passwd /etc/shadow 2>/dev/null || true
+echo 'ubnt:x:0:0:ubnt:/root:/bin/ash' >> /etc/passwd
+if command -v openssl >/dev/null 2>&1; then
+	UH=$(openssl passwd -6 ubnt 2>/dev/null)
+	echo "ubnt:$UH:19700:0:99999:7:::" >> /etc/shadow
+else
+	echo -e "ubnt\nubnt" | passwd ubnt 2>/dev/null || true
+fi
 
 # Direct LuCI access without portal gate interception
 uci set openuf.web=openuf
@@ -84,6 +95,7 @@ uci commit uhttpd
 # ── services ───────────────────────────────────────────────────────────────
 /etc/init.d/lldpd enable
 /etc/init.d/openuf enable
+[ -x /etc/init.d/openuf-autodiscover ] && /etc/init.d/openuf-autodiscover enable
 [ -x /etc/init.d/openuf-rrb ] && /etc/init.d/openuf-rrb enable
 [ -x /etc/init.d/tailscale ] && /etc/init.d/tailscale enable
 

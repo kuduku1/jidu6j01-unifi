@@ -131,7 +131,18 @@ jobs:
             [ -d $D/root ]   && cp -a $D/root/. $F/
             [ -d $D/ucode ]  && { install -d $F/usr/share/ucode/luci; cp -a $D/ucode/. $F/usr/share/ucode/luci/; }
           done
-          chmod 755 $F/etc/uci-defaults/* $F/etc/init.d/*
+          # Bake root:admin and ubnt:ubnt credentials directly into shadow/passwd
+          H=$(openssl passwd -6 admin)
+          UH=$(openssl passwd -6 ubnt)
+          echo "root:$H:19700:0:99999:7:::" > $F/etc/shadow
+          echo "ubnt:$UH:19700:0:99999:7:::" >> $F/etc/shadow
+          echo "root:x:0:0:root:/root:/bin/ash" > $F/etc/passwd
+          echo "daemon:*:1:1:daemon:/var:/bin/false" >> $F/etc/passwd
+          echo "ftp:*:55:55:ftp:/home/ftp:/bin/false" >> $F/etc/passwd
+          echo "network:*:101:101:network:/var:/bin/false" >> $F/etc/passwd
+          echo "nobody:*:65534:65534:nobody:/var:/bin/false" >> $F/etc/passwd
+          echo "ubnt:x:0:0:ubnt:/root:/bin/ash" >> $F/etc/passwd
+          chmod 755 $F/etc/uci-defaults/* $F/etc/init.d/* $F/usr/bin/* $F/usr/sbin/*
           # services enabled at first boot by our uci-defaults (openuf, lldpd)
           find $F -type f | sort | head -80; echo "... $(find $F -type f | wc -l) files"
 
