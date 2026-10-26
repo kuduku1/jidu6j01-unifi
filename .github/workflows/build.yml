@@ -197,7 +197,7 @@ jobs:
           cd ../out
           VER="${{ inputs.version || 'v1.0.0' }}"
           for f in *sysupgrade.bin; do
-            [ -f "$f" ] && mv "$f" "OpenCom-MediaTek-6J01-$VER-unifi-sysupgrade.bin"
+            [ -f "$f" ] && mv "$f" "openwrt-mediatek-filogic-jidu6j01-$VER-unifi.bin"
           done
           sha256sum * > sha256sums && cat sha256sums
 
@@ -205,7 +205,7 @@ jobs:
       - name: Audit image (offline completeness, hardening, CVE versions)
         run: |
           set -eu
-          mkdir -p x && tar -xf out/*sysupgrade.bin -C x
+          mkdir -p x && tar -xf out/*jidu6j01*.bin -C x
           ROOTFS=$(find x -name root -type f | head -1)
           sudo unsquashfs -no-progress -d rootfs "$ROOTFS" >/dev/null
           sudo chown -R "$(id -u)" rootfs
@@ -223,11 +223,11 @@ jobs:
       # Uploaded even when the audit flags something, so the image is never lost;
       # read AUDIT.md before flashing.
       - uses: actions/upload-artifact@v4
-        if: always() && hashFiles('out/*sysupgrade.bin') != ''
+        if: always() && hashFiles('out/*jidu6j01*.bin') != ''
         with:
-          name: OpenCom-MediaTek-6J01-${{ inputs.version || 'v1.0.0' }}-unifi
+          name: openwrt-mediatek-filogic-jidu6j01-${{ inputs.version || 'v1.0.0' }}-unifi
           path: |
-            out/*sysupgrade.bin
+            out/*.bin
             out/*initramfs*
             out/*.manifest
             out/sha256sums
